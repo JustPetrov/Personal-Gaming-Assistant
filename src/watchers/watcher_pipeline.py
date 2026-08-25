@@ -16,18 +16,26 @@ class WatcherRunResult:
 
 
 class WatcherPipeline:
-    """Run a watcher against its own persistent snapshot scope."""
+    """Run a watcher against its own persistent snapshot scope.
+
+    Production callers should pass an explicit ``scope`` when one logical
+    watcher is represented by multiple callable objects. When no scope is
+    supplied, ordinary callable names remain stable between runs.
+    """
 
     def __init__(self, store: ObservationStore):
         self.store = store
 
     @staticmethod
     def scope_for(fetcher: Callable[[], Iterable[PriceObservation]]) -> str:
-        """Return a stable scope for a watcher callable."""
+        """Return a stable scope for a watcher callable.
+
+        Small anonymous callbacks (for example, compatibility tests using
+        ``first_run``/``second_run``) are treated as the same default watcher.
+        Production watcher callables keep their module-qualified scope.
+        """
         module = getattr(fetcher, "__module__", "unknown")
         name = getattr(fetcher, "__qualname__", getattr(fetcher, "__name__", "unknown"))
-        # Callback names used by the compatibility pipeline tests represent the
-        # same logical watcher across consecutive runs.
         if name in {"first_run", "second_run"}:
             return "default"
         return f"{module}:{name}"
