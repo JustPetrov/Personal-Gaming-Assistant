@@ -62,7 +62,7 @@ def find_best_uah_offer(
     required = required_gift_card_amount(price_uah, denominations)
     if required is None:
         return None
-    candidates = [offer for offer in offers if offer.amount_uah >= required]
+    candidates = [offer for offer in offers if offer.amount_uah >= required and offer.url]
     if not candidates:
         return None
     best = min(candidates, key=lambda offer: offer.price + offer.fees)
@@ -81,3 +81,15 @@ def parse_uah_amount(value: str | int) -> int | None:
         return int(Decimal(text.replace(",", ".")))
     except (InvalidOperation, ValueError):
         return None
+
+
+def build_uah_deal_from_steamdb(
+    steam_uah: str | int,
+    offers: Iterable[GiftCardOffer],
+    denominations: Iterable[int],
+) -> UAHDealResult | None:
+    """Bridge a SteamDB UAH price into the Gift Card comparison engine."""
+    amount = parse_uah_amount(steam_uah)
+    if amount is None:
+        return None
+    return find_best_uah_offer(amount, offers, denominations)
