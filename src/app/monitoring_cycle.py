@@ -12,6 +12,7 @@ from watchers.watcher_registry_gamescom import get_gamescom_fetchers
 from gamescom.stock_monitor import monitor_stock
 from gamescom.epix_observations import collect_epix_observations
 from gamescom.discord_epix_alerts import send_epix_alerts
+from gamescom_data import write_dashboard_data
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data"
@@ -88,6 +89,16 @@ def _publish_dashboard_state(observations: list[dict], changed: list[dict], star
     """Publish the latest monitoring cycle in the JSON files consumed by the dashboard."""
     DATA.mkdir(parents=True, exist_ok=True)
 
+    gamescom_events = [
+        item for item in observations
+        if str(item.get("type", "")).startswith("gamescom_")
+        or item.get("source") == "gamescom official ticket shop"
+    ]
+    try:
+        write_dashboard_data(gamescom_events)
+    except Exception as exc:
+        print(f"GamesCom dashboard sync failed: {exc}")
+
     prices = [
         {
             "product": item.get("product") or item.get("title") or item.get("name"),
@@ -127,6 +138,7 @@ def _publish_dashboard_state(observations: list[dict], changed: list[dict], star
         "items_checked": len(observations),
         "price_items": len(prices),
         "changes": len(changed),
+        "gamescom_items": len(gamescom_events),
     })
     updates_path.write_text(
         json.dumps(updates[-100:], ensure_ascii=False, indent=2),
