@@ -5,21 +5,16 @@ from datetime import date
 import os
 
 from .gamescom_hotel_live import GamesComHotelLiveClient, HotelOffer
-from .gamescom_registry_watchers import (
-    GamesComAnnouncementStatus,
-    GamesComTicketSnapshot,
-    announcement_observations,
-    ticket_alerts,
-)
+from .gamescom_registry_watchers import GamesComAnnouncementStatus, announcement_observations
 from .gamescom_hotel_recommendations import HotelRecommendation, rank_hotels
 from .gamescom_ticket_live import GamesComTicketLiveClient
 from .gamescom_ticket_stock import TicketStatus
+from storage.hotel_history import append_hotel_observations
 
 
 def get_gamescom_fetchers() -> tuple[Callable[[], Iterable[dict]], ...]:
     """Return GamesCom live fetchers enabled by configuration."""
     fetchers: list[Callable[[], Iterable[dict]]] = []
-
     if os.getenv("GAMESCOM_ANNOUNCEMENT_WATCH_ENABLED", "true").lower() == "true":
         fetchers.append(_announcement_fetcher)
     if os.getenv("GAMESCOM_TICKET_STOCK_WATCH_ENABLED", "true").lower() == "true":
@@ -39,7 +34,6 @@ def _announcement_fetcher() -> Iterable[dict]:
 
 
 def _ticket_stock_fetcher() -> Iterable[dict]:
-    """Fetch official GamesCom ticket stock as normalized observations."""
     client = GamesComTicketLiveClient()
     try:
         statuses: list[TicketStatus] = client.fetch_statuses()
@@ -98,6 +92,8 @@ def _hotel_to_recommendation(offer: HotelOffer) -> HotelRecommendation:
         url=offer.url,
         reason=f"{offer.source}; availability={offer.availability}; nights={offer.nights}",
         location=None,
+        nights=offer.nights,
+        total_price=offer.total_price,
     )
 
 
@@ -125,9 +121,10 @@ def _hotel_recommendation_fetcher() -> Iterable[dict]:
     if not selected:
         selected = [("Live hotel offer", item) for item in recommendations if item.url]
 
+    output: list[dict] = []
     for category, offer in selected:
         raw_offer = next((item for item in offers if item.hotel == offer.name and item.url == offer.url), None)
-        yield {
+        output.append({
             "type": "gamescom_hotel_offer",
             "product": offer.name,
             "platform": "GamesCom Hotel",
@@ -135,6 +132,7 @@ def _hotel_recommendation_fetcher() -> Iterable[dict]:
             "price": str(offer.price_per_night) if offer.price_per_night is not None else None,
             "price_per_night": str(offer.price_per_night) if offer.price_per_night is not None else None,
             "total_price": str(raw_offer.total_price) if raw_offer and raw_offer.total_price is not None else None,
+            "currency": raw_offer.currency if raw_offer else ("EUR" if offer.price_per_night is not None else None),
             "nights": raw_offer.nights if raw_offer else (check_out - check_in).days,
             "check_in": check_in.isoformat(),
             "check_out": check_out.isoformat(),
@@ -145,4 +143,7 @@ def _hotel_recommendation_fetcher() -> Iterable[dict]:
             "url": offer.url,
             "source": raw_offer.source if raw_offer else "live hotel provider",
             "reason": offer.reason,
-        }
+        })
+
+    append_hotel_observations(output)
+    yield from output
