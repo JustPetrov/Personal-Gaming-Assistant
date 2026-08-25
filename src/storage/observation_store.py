@@ -10,30 +10,54 @@ from watchers.price_models import PriceObservation
 
 
 class ObservationStore:
-    """Small JSON-backed snapshot store suitable for a single VPS process."""
+    """Persistent watcher snapshots, partitioned by watcher scope.
+
+    Each watcher gets its own snapshot inside one JSON file. This prevents a
+    five-minute cycle from overwriting the previous watcher's state.
+    """
 
     def __init__(self, path: str | Path = "data/state/price_observations.json"):
         self.path = Path(path)
 
-    def load(self) -> list[PriceObservation]:
-        if not self.path.exists():
-            return []
-        data = json.loads(self.path.read_text(encoding="utf-8"))
-        return [self._from_dict(item) for item in data.get("observations", [])]
+    def load(self, scope: str = "default") -> list[PriceObservation]:
+        payload = self._load_payload()
+        scopes = payload.get("scopes")
+        if isinstance(scopes, dict):
+            return [self._from_dict(item) for item in scopes.get(scope, [])]
 
-    def save(self, observations: list[PriceObservation]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
+        # Backwards compatibility with the original single-snapshot format.
+        return [self._from_dict(item) for item in payload.get("observations", [])]
+
+    def save(self, observations: list[PriceObservation], scope: str = "default") -> None:
+        payload = self._load_payload()
+        scopes = payload.get("scopes")
+        if not isinstance(scopes, dict):
+            legacy = payload.get("observations", [])
+            scopes = {"default": legacy} if legacy else {}
+
+        scopes[scope] = [self._to_dict(item) for item in observations]
+        output = {
             "updated_at": datetime.now(timezone.utc).isoformat(),
-            "observations": [self._to_dict(item) for item in observations],
+            "scopes": scopes,
         }
+
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         # Atomic replace prevents a VPS restart/write interruption from leaving
         # a partially written snapshot behind.
         with NamedTemporaryFile("w", encoding="utf-8", dir=self.path.parent, delete=False) as temp:
-            json.dump(payload, temp, ensure_ascii=False, indent=2)
+            json.dump(output, temp, ensure_ascii=False, indent=2)
             temp.write("\n")
             temp_path = Path(temp.name)
         temp_path.replace(self.path)
+
+    def _load_payload(self) -> dict:
+        if not self.path.exists():
+            return {}
+        try:
+            value = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return value if isinstance(value, dict) else {}
 
     @staticmethod
     def _to_dict(observation: PriceObservation) -> dict:
