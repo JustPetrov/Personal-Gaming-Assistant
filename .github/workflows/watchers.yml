@@ -32,14 +32,14 @@ jobs:
           PYTHONPATH: src
         run: python -m app.watch_cycle
 
-      - name: Persist watcher state
+      - name: Persist watcher state and daily history
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/state
+          git add data/state data/history.json
           if git diff --cached --quiet; then
-            echo "No state changes."
+            echo "No state or history changes."
           else
-            git commit -m "Update watcher state"
+            git commit -m "Update watcher state and history"
             git push
           fi
