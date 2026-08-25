@@ -13,6 +13,8 @@ from gamescom.stock_monitor import monitor_stock
 from gamescom.epix_observations import collect_epix_observations
 from gamescom.discord_epix_alerts import send_epix_alerts
 from gamescom_data import write_dashboard_data
+from calendar_store import due_reminders
+from notification_service import NotificationService
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data"
@@ -95,8 +97,6 @@ def _publish_dashboard_state(observations: list[dict], changed: list[dict], star
     except Exception as exc:
         print(f"GamesCom dashboard sync failed: {exc}")
 
-    # Persist the full non-price observation stream so dedicated watcher pages
-    # can show EPIX, tickets, announcements and errors without inventing data.
     watcher_path = DATA / "watcher_state.json"
     watcher_state = {
         "last_synced": started,
@@ -150,15 +150,32 @@ def _publish_dashboard_state(observations: list[dict], changed: list[dict], star
     updates_path.write_text(json.dumps(updates[-100:], ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _dispatch_due_reminders() -> int:
+    """Send due calendar reminders once, then mark them as sent."""
+    service = NotificationService()
+    sent = 0
+    for reminder in due_reminders():
+        result = service.alert(
+            f"⏰ {reminder.get('title', 'Reminder')}",
+            "Je ingestelde kalenderherinnering is bereikt.",
+            url="/calendar",
+        )
+        if result.get("push") or result.get("discord"):
+            sent += 1
+    return sent
+
+
 def run_monitoring_cycle() -> list[dict]:
     started = datetime.now(timezone.utc).isoformat()
     observations = collect_observations()
     persisted = persist_price_observations(observations)
     changed = ChangeDetector().process(observations)
     _publish_dashboard_state(observations, changed, started)
+    reminder_count = _dispatch_due_reminders()
     print(
         f"Monitoring cycle started={started} "
-        f"observations={len(observations)} prices_persisted={persisted} changes={len(changed)}"
+        f"observations={len(observations)} prices_persisted={persisted} changes={len(changed)} "
+        f"reminders_sent={reminder_count}"
     )
     return changed
 
