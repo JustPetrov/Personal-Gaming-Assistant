@@ -1,0 +1,43 @@
+name: Gaming Assistant Watcher
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: gaming-assistant-watcher
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run monitoring cycle
+        env:
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+          STEAM_PROFILE_URL: ${{ secrets.STEAM_PROFILE_URL }}
+          OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL }}
+          OLLAMA_MODEL: ${{ secrets.OLLAMA_MODEL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GAME_PRICE_WATCH_APP_IDS: ${{ secrets.GAME_PRICE_WATCH_APP_IDS }}
+          TWEAKERS_PRICE_HISTORY_URLS: ${{ secrets.TWEAKERS_PRICE_HISTORY_URLS }}
+          BOL_HARDWARE_URLS: ${{ secrets.BOL_HARDWARE_URLS }}
+          AZERTY_HARDWARE_URLS: ${{ secrets.AZERTY_HARDWARE_URLS }}
+          ALTERNATE_HARDWARE_URLS: ${{ secrets.ALTERNATE_HARDWARE_URLS }}
+          MEGEKKO_HARDWARE_URLS: ${{ secrets.MEGEKKO_HARDWARE_URLS }}
+          AMAZON_NL_HARDWARE_URLS: ${{ secrets.AMAZON_NL_HARDWARE_URLS }}
+        run: python -m app.monitoring_cycle
