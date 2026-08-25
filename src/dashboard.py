@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+from app.monitoring_cycle import run_monitoring_cycle
 from ollama_web import OllamaClient, WebContext
 from web_sources import DEFAULT_SOURCES
 
@@ -127,11 +128,12 @@ def gamescom():
 
 @app.post("/api/update")
 def manual_update():
+    try:
+        changed = run_monitoring_cycle()
+    except Exception as exc:
+        raise HTTPException(500, f"Monitoring cycle failed: {exc}") from exc
     stamp = datetime.now(ZoneInfo("Europe/Amsterdam")).isoformat()
-    updates = read_json("updates.json", [])
-    updates.append({"timestamp": stamp, "type": "manual", "status": "requested"})
-    write_json("updates.json", updates[-100:])
-    return {"status": "requested", "timestamp": stamp}
+    return {"status": "completed", "timestamp": stamp, "changes": len(changed)}
 
 
 @app.post("/api/ai")
@@ -171,12 +173,13 @@ function clearWishForm(){for(const id of ['wishTitle','wishPlatform','wishUrl','
 async function addWish(){const title=document.querySelector('#wishTitle').value.trim();if(!title)return;const body={id:crypto.randomUUID(),title,category:document.querySelector('#wishCategory').value,platform:document.querySelector('#wishPlatform').value.trim()||null,app_id:null,url:document.querySelector('#wishUrl').value.trim()||null,notes:document.querySelector('#wishNotes').value.trim()||null};await fetch('/api/wishlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});clearWishForm();load()}
 async function editWish(x){const title=prompt('Naam',x.title);if(!title)return;const category=prompt('Categorie: game, hardware of gear',x.category)||x.category;const platform=prompt('Platform (optioneel)',x.platform||'');await fetch('/api/wishlist/'+encodeURIComponent(x.id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...x,title,category,platform:platform||null})});load()}
 async function deleteWish(id){if(!confirm('Verwijderen?'))return;await fetch('/api/wishlist/'+encodeURIComponent(id),{method:'DELETE'});load()}
-async function manualUpdate(){await fetch('/api/update',{method:'POST'});load()}
-async function askAI(){const q=document.querySelector('#q').value.trim();if(!q)return;document.querySelector('#answer').textContent='Webbronnen ophalen…';document.querySelector('#sources').textContent='';const r=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});const d=await r.json();document.querySelector('#answer').textContent=d.answer||'Geen antwoord';document.querySelector('#sources').textContent='Bronnen: '+(d.sources||[]).join(' · ')}load();setInterval(load,60000);
-const c=document.querySelector('#rain'),x=c.getContext('2d'),chars='アカサタナハマヤラワ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ<>[]{}+-*/';let drops=[];function resize(){c.width=innerWidth*devicePixelRatio;c.height=innerHeight*devicePixelRatio;x.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);drops=Array(Math.ceil(innerWidth/18)).fill(0).map(()=>Math.random()*innerHeight/18)}addEventListener('resize',resize);resize();function rain(){x.fillStyle='rgba(0,0,0,.10)';x.fillRect(0,0,innerWidth,innerHeight);x.font='14px monospace';for(let i=0;i<drops.length;i++){let ch=chars[Math.floor(Math.random()*chars.length)],y=drops[i]*18;x.fillStyle=Math.random()>.96?'#baffc0':'#0bd42b';x.fillText(ch,i*18,y);if(y>innerHeight&&Math.random()>.975)drops[i]=0;else drops[i]+=.55}requestAnimationFrame(rain)}rain();
+async function manualUpdate(){const b=document.querySelector('.manual');b.disabled=true;b.textContent='⟳ Bezig…';try{const r=await fetch('/api/update',{method:'POST'});const j=await r.json();b.textContent=j.status==='completed'?'✓ Bijgewerkt':'⚠ Fout';await load()}catch(e){b.textContent='⚠ Fout'}finally{setTimeout(()=>{b.disabled=false;b.textContent='↻ Manual Update'},1600)}}
+async function askAI(){const q=document.querySelector('#q').value.trim();if(!q)return;document.querySelector('#answer').textContent='Onderzoek en antwoord wordt opgebouwd…';const r=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});const j=await r.json();document.querySelector('#answer').textContent=j.answer||j.detail||'Geen antwoord';document.querySelector('#sources').innerHTML=(j.sources||[]).map(x=>`<div>${esc(x)}</div>`).join('')}
+load();setInterval(load,30000);
+const c=document.getElementById('rain'),ctx=c.getContext('2d');let w,h,cols,drops;function resize(){w=c.width=innerWidth*devicePixelRatio;h=c.height=innerHeight*devicePixelRatio;c.style.width=innerWidth+'px';c.style.height=innerHeight+'px';ctx.font=(14*devicePixelRatio)+'px monospace';cols=Math.floor(w/(14*devicePixelRatio));drops=Array(cols).fill(0).map(()=>Math.random()*h/(14*devicePixelRatio))}addEventListener('resize',resize);resize();function rain(){ctx.fillStyle='rgba(0,0,0,.08)';ctx.fillRect(0,0,w,h);ctx.fillStyle='#0f3';for(let i=0;i<cols;i++){ctx.fillText(Math.random()>.5?'1':'0',i*14*devicePixelRatio,drops[i]*14*devicePixelRatio);if(drops[i]*14*devicePixelRatio>h&&Math.random()>.975)drops[i]=0;drops[i]+=1}requestAnimationFrame(rain)}rain();
 </script></body></html>'''
 
 
-@app.get('/', response_class=HTMLResponse)
-def dashboard():
+@app.get("/", response_class=HTMLResponse)
+def index():
     return HTML
