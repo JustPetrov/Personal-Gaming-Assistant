@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import argparse
-import json
 from datetime import datetime, timezone
 
+from app.discord_news import send_news
 from app.news_context_builder import build_news_context_from_observations
 from app.ollama_news import write_news
 from app.monitoring_cycle import collect_observations
@@ -44,7 +44,7 @@ def main() -> None:
     article = write_news(context)
     if not article:
         raise RuntimeError("Ollama returned an empty news article")
-    print(article)
+    send_news(article)
 
 
 if __name__ == "__main__":
