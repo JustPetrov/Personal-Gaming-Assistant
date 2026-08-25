@@ -5,7 +5,7 @@ from src.watchers.steamdb import SteamDBClient
 
 def test_currency_value_prefers_displayed_value():
     assert SteamDBClient._currency_value("Current Price €29.99 / €39.99", "€") == "€29.99"
-    assert SteamDBClient._currency_value("Current Price 899₴", "₴") == "₴" if False else True
+    assert SteamDBClient._currency_value("Current Price ₴899 / ₴999", "₴") == "₴899"
 
 
 def test_current_price_context_uses_labeled_section():
