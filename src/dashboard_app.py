@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
-from datetime import datetime
 from pathlib import Path
 
 from fastapi.responses import HTMLResponse
 
-# dashboard.py is intentionally a sibling of the dashboard/ package. Load it
-# explicitly so Python never resolves the package instead of the ASGI app.
 _MODULE_PATH = Path(__file__).with_name("dashboard.py")
 _SPEC = importlib.util.spec_from_file_location("pga_dashboard_module", _MODULE_PATH)
 if _SPEC is None or _SPEC.loader is None:
@@ -16,26 +13,13 @@ _MODULE = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_MODULE)
 app = _MODULE.app
 
-# Register the dedicated GamesCom Center and global Watcher Center.
 from dashboard_pages import register  # noqa: E402
 register(app)
 
-# The homepage is intentionally minimal: only the latest news, GamesCom
-# countdown and Ollama chat. The other dashboard functionality remains
-# available through its dedicated pages/API endpoints.
 app.routes[:] = [
     route for route in app.routes
     if not (getattr(route, "path", None) == "/" and "GET" in getattr(route, "methods", set()))
 ]
-
-
-def _latest_news() -> dict:
-    return _MODULE.latest_news()
-
-
-def _gamescom() -> dict:
-    return _MODULE.gamescom()
-
 
 @app.get("/", response_class=HTMLResponse)
 def homepage():
@@ -52,18 +36,20 @@ HOMEPAGE = r'''<!doctype html>
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:#e9f8ea;font-family:Inter,system-ui,sans-serif}
 body{overflow-x:hidden}.matrix{position:fixed;inset:0;z-index:-2;background:#000}.matrix canvas{width:100%;height:100%;display:block}
 .veil{position:fixed;inset:0;z-index:-1;background:radial-gradient(circle at 50% 20%,rgba(0,40,5,.28),rgba(0,0,0,.8) 72%)}
-main{min-height:100vh;max-width:1500px;margin:auto;padding:28px;display:grid;grid-template-columns:repeat(12,1fr);gap:18px;align-content:center}
-.card{grid-column:span 4;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 0 30px rgba(0,255,40,.07),inset 0 0 25px rgba(0,255,40,.025);backdrop-filter:blur(7px)}
+.topbar{position:sticky;top:0;z-index:10;background:rgba(0,5,1,.94);border-bottom:1px solid var(--line);backdrop-filter:blur(12px);padding:10px 18px;display:flex;align-items:center;gap:18px}.brand{font-weight:900;color:var(--g);white-space:nowrap;letter-spacing:.5px}.tabs{display:flex;gap:7px;flex-wrap:wrap}.tabs a{color:#a9c8ad;text-decoration:none;background:#061608;border:1px solid rgba(32,255,59,.18);border-radius:8px;padding:8px 12px;font-size:13px}.tabs a:hover,.tabs a.active{color:var(--g);border-color:var(--line);background:#0a2810;box-shadow:0 0 12px rgba(32,255,59,.12)}
+main{min-height:calc(100vh - 58px);max-width:1500px;margin:auto;padding:28px;display:grid;grid-template-columns:repeat(12,1fr);gap:18px;align-content:center}
+.card{grid-column:span 4;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 0 30px rgba(0,255,40,.07),inset 0 0 25px rgba(0,255,59,.025);backdrop-filter:blur(7px)}
 h1{grid-column:1/-1;text-align:center;color:var(--g);font-size:24px;letter-spacing:1px;margin:0 0 2px;text-shadow:0 0 18px rgba(32,255,59,.3)}
 h2{margin:0 0 16px;color:var(--g);font-size:15px;text-transform:uppercase;letter-spacing:.8px}
 .newsTitle{font-size:23px;font-weight:800;color:#fff;margin-bottom:10px}.newsSummary{font-size:15px;line-height:1.6;color:#d5efd7}.meta{font-size:11px;color:var(--muted);margin-top:15px}.meta a,a{color:var(--g)}
 .countdown{text-align:center}.countValue{font-size:42px;font-weight:900;color:var(--g);text-shadow:0 0 24px rgba(32,255,59,.4);margin:18px 0}.countLabel{font-size:12px;color:var(--muted)}
 .aiDesc{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px}.airow{display:flex;gap:8px}.airow input{min-width:0;flex:1;background:#020703;color:#fff;border:1px solid var(--line);border-radius:8px;padding:11px}.airow button{background:#061608;color:var(--g);border:1px solid var(--line);border-radius:8px;padding:10px 14px;cursor:pointer}.answer{white-space:pre-wrap;margin-top:13px;color:#d5efd7;max-height:310px;overflow:auto;line-height:1.5}.sources{font-size:10px;color:var(--muted);margin-top:10px;word-break:break-all}
-@media(max-width:950px){main{align-content:start;padding:18px}.card{grid-column:1/-1}h1{margin-top:10px}}
+@media(max-width:950px){.topbar{align-items:flex-start;flex-direction:column}.tabs{width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.tabs a{white-space:nowrap}main{align-content:start;padding:18px}.card{grid-column:1/-1}h1{margin-top:10px}}
 </style>
 </head>
 <body>
 <div class="matrix"><canvas id="rain"></canvas></div><div class="veil"></div>
+<header class="topbar"><div class="brand">▣ PGA</div><nav class="tabs"><a class="active" href="/">🏠 Home</a><a href="/gamescom">🎮 GamesCom</a><a href="/watchers">👁 Watchers</a></nav></header>
 <main>
 <h1>▣ PERSONAL GAMING ASSISTANT</h1>
 <section class="card"><h2>📰 Laatste nieuwsupdate</h2><div id="news">Laden...</div></section>
