@@ -9,11 +9,7 @@ WatcherFetcher = Callable[[], Iterable[PriceObservation]]
 
 
 def get_fetchers() -> tuple[WatcherFetcher, ...]:
-    """Return enabled live watchers.
-
-    Each adapter is optional: a missing dependency/configuration does not stop
-    unrelated watchers from running. Secrets and target IDs remain in env vars.
-    """
+    """Return enabled live watchers, including GamesCom/EPIX monitoring."""
     fetchers: list[WatcherFetcher] = []
 
     steam_ids = _csv_ints("STEAM_APP_IDS")
@@ -34,6 +30,10 @@ def get_fetchers() -> tuple[WatcherFetcher, ...]:
     if os.getenv("DISCORD_PRICE_WATCH_ENABLED", "false").lower() == "true":
         from watchers.discord_price_adapter import DiscordPriceAdapter
         fetchers.append(DiscordPriceAdapter().fetch)
+
+    if os.getenv("EPIX_WATCH_ENABLED", "true").lower() == "true":
+        from watchers.gamescom_registry_adapters import epix_quest_fetcher
+        fetchers.append(epix_quest_fetcher)
 
     return tuple(fetchers)
 
