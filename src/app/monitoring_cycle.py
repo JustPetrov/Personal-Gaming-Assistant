@@ -8,6 +8,7 @@ from storage.history_ingest import persist_price_observations
 from watchers.hardware_source_dispatcher import configured_hardware_observations
 from watchers.watcher_registry_gamescom import get_gamescom_fetchers
 from gamescom.stock_monitor import monitor_stock
+from gamescom.epix_observations import collect_epix_observations
 
 
 def collect_observations() -> list[dict]:
@@ -33,8 +34,15 @@ def collect_observations() -> list[dict]:
             "error": str(exc),
         })
 
-    # Ticket stock is handled as a stateful alert stream. Keep the live
-    # observations in the normal payload while only emitting changed alerts.
+    try:
+        observations.extend(collect_epix_observations())
+    except Exception as exc:
+        observations.append({
+            "type": "watcher_error",
+            "source": "collect_epix_observations",
+            "error": str(exc),
+        })
+
     ticket_statuses = [
         item for item in observations
         if item.get("type") == "gamescom_ticket_status"
