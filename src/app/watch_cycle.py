@@ -8,12 +8,7 @@ from watchers.watcher_pipeline import WatcherPipeline
 
 
 def run_cycle() -> None:
-    """Run one five-minute monitoring cycle.
-
-    Watchers are loaded from the registry when available. A missing/empty
-    registry is deliberately a no-op so the GitHub Actions job remains safe
-    while individual live adapters are being enabled.
-    """
+    """Run one five-minute monitoring cycle with isolated watcher state."""
     registry_path = Path("src/app/watcher_registry.py")
     if not registry_path.exists():
         print("Watcher registry not configured; nothing to run.")
@@ -33,7 +28,10 @@ def run_cycle() -> None:
         result = pipeline.run(fetcher)
         changed += len(result.changes)
 
-    print(f"Watcher cycle completed at {datetime.now(timezone.utc).isoformat()}; changes={changed}")
+    print(
+        f"Watcher cycle completed at {datetime.now(timezone.utc).isoformat()}; "
+        f"watchers={len(fetchers)} changes={changed}"
+    )
 
 
 if __name__ == "__main__":
