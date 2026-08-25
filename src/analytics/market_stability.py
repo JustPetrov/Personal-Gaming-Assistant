@@ -45,11 +45,7 @@ def evaluate_instability(
     baseline = min(p.price for p in window)
     average = mean(p.price for p in window)
     active = baseline > 0 and average / baseline >= explosive_ratio
-    return StabilityResult(
-        active,
-        average,
-        f"14-day average/min ratio={average / baseline:.2f}" if baseline else "Invalid baseline",
-    )
+    return StabilityResult(active, average, f"14-day average/min ratio={average / baseline:.2f}" if baseline else "Invalid baseline")
 
 
 def evaluate_required_segments(
@@ -57,13 +53,9 @@ def evaluate_required_segments(
     required_categories: tuple[str, ...],
     *,
     days: int = 14,
-    explosive_ratio: float = 1.20,
+    explosive_ratio: float = 1.15,
 ) -> MultiSegmentResult:
-    """Evaluate every required market segment independently and require complete coverage.
-
-    Missing segments never count as healthy; the alert remains inactive until every
-    required segment has a full rolling history and meets the configured threshold.
-    """
+    """Require every configured segment to have a full 14-day signal."""
     results: dict[str, StabilityResult] = {}
     for category in required_categories:
         category_points = [point for point in points if point.category == category]
@@ -83,24 +75,16 @@ def evaluate_required_segments(
 
 
 def rammegedon(points: list[MarketPoint]) -> StabilityResult:
-    """Preserve the existing single-segment RAMmagedon API."""
     return evaluate_instability(points)
 
 
-def rammegedon_segments(
-    points: list[MarketPoint],
-    segments: tuple[str, ...] = RAM_SEGMENTS,
-) -> MultiSegmentResult:
+def rammegedon_segments(points: list[MarketPoint], segments: tuple[str, ...] = RAM_SEGMENTS) -> MultiSegmentResult:
     return evaluate_required_segments(points, segments)
 
 
 def gpu_doomsday(points: list[MarketPoint]) -> StabilityResult:
-    """Preserve the existing single-segment GPU Doomsday API."""
     return evaluate_instability(points)
 
 
-def gpu_doomsday_segments(
-    points: list[MarketPoint],
-    required_categories: tuple[str, ...],
-) -> MultiSegmentResult:
+def gpu_doomsday_segments(points: list[MarketPoint], required_categories: tuple[str, ...]) -> MultiSegmentResult:
     return evaluate_required_segments(points, required_categories)
