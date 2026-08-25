@@ -15,6 +15,8 @@ app = _MODULE.app
 
 from dashboard_pages import register  # noqa: E402
 register(app)
+from calendar_page import register as register_calendar  # noqa: E402
+register_calendar(app)
 
 app.routes[:] = [
     route for route in app.routes
@@ -49,7 +51,7 @@ h2{margin:0 0 16px;color:var(--g);font-size:15px;text-transform:uppercase;letter
 </head>
 <body>
 <div class="matrix"><canvas id="rain"></canvas></div><div class="veil"></div>
-<header class="topbar"><div class="brand">▣ PGA</div><nav class="tabs"><a class="active" href="/">🏠 Home</a><a href="/gamescom">🎮 GamesCom</a><a href="/watchers">👁 Watchers</a></nav></header>
+<header class="topbar"><div class="brand">▣ PGA</div><nav class="tabs"><a class="active" href="/">🏠 Home</a><a href="/gamescom">🎮 GamesCom</a><a href="/watchers">👁 Watchers</a><a href="/wishlist">❤️ Wishlist</a><a href="/calendar">📅 Calendar</a></nav></header>
 <main>
 <h1>▣ PERSONAL GAMING ASSISTANT</h1>
 <section class="card"><h2>📰 Laatste nieuwsupdate</h2><div id="news">Laden...</div></section>
