@@ -9,6 +9,7 @@ from watchers.hardware_source_dispatcher import configured_hardware_observations
 from watchers.watcher_registry_gamescom import get_gamescom_fetchers
 from gamescom.stock_monitor import monitor_stock
 from gamescom.epix_observations import collect_epix_observations
+from gamescom.discord_epix_alerts import send_epix_alerts
 
 
 def collect_observations() -> list[dict]:
@@ -35,7 +36,10 @@ def collect_observations() -> list[dict]:
         })
 
     try:
-        observations.extend(collect_epix_observations())
+        epix_observations = collect_epix_observations()
+        observations.extend(epix_observations)
+        if epix_observations:
+            send_epix_alerts(epix_observations)
     except Exception as exc:
         observations.append({
             "type": "watcher_error",
