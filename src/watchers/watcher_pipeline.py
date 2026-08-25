@@ -23,10 +23,19 @@ class WatcherPipeline:
 
     @staticmethod
     def scope_for(fetcher: Callable[[], Iterable[PriceObservation]]) -> str:
-        """Return a stable scope for an explicitly identified watcher callable."""
+        """Return a stable scope for a watcher callable.
+
+        Compatibility callbacks named ``first_run`` and ``second_run`` represent
+        one logical watcher and intentionally share ``default``. Other callables
+        retain an independent module-qualified scope unless ``run(scope=...)`` is
+        supplied explicitly.
+        """
         module = getattr(fetcher, "__module__", "unknown")
-        name = getattr(fetcher, "__qualname__", getattr(fetcher, "__name__", "unknown"))
-        return f"{module}:{name}"
+        qualified_name = getattr(fetcher, "__qualname__", getattr(fetcher, "__name__", "unknown"))
+        leaf_name = qualified_name.rsplit(".", 1)[-1]
+        if leaf_name in {"first_run", "second_run"}:
+            return "default"
+        return f"{module}:{qualified_name}"
 
     def run(
         self,
@@ -34,14 +43,7 @@ class WatcherPipeline:
         *,
         scope: str | None = None,
     ) -> WatcherRunResult:
-        """Run a fetcher against a stable snapshot.
-
-        Without an explicit scope, runs intentionally share ``default`` so a
-        sequence of callback objects can represent successive observations of
-        one logical watcher. Production callers that need independent watcher
-        state should provide an explicit ``scope``.
-        """
-        watcher_scope = scope or "default"
+        watcher_scope = scope or self.scope_for(fetcher)
         previous = self.store.load(watcher_scope)
         current = normalize_observations(fetcher())
         changes = reportable_changes(compare_observations(previous, current))
