@@ -14,6 +14,8 @@ class HotelRecommendation:
     url: str | None
     reason: str
     location: str | None = None
+    nights: int | None = None
+    total_price: Decimal | None = None
 
 
 def _quality_score(o: HotelRecommendation) -> Decimal:
