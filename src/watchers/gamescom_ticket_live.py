@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
@@ -21,11 +20,7 @@ class LiveTicketPage:
 
 
 class GamesComTicketLiveClient:
-    """Read the official gamescom ticket shop and expose day-level status.
-
-    The shop markup is allowed to change: selectors are deliberately broad and
-    status is inferred from visible text rather than relying on one CSS class.
-    """
+    """Read the official gamescom ticket shop and expose day-level status."""
 
     def __init__(self, session: requests.Session | None = None, timeout: float = 20.0):
         self.session = session or requests.Session()
@@ -41,36 +36,35 @@ class GamesComTicketLiveClient:
         page = self.fetch_page()
         soup = BeautifulSoup(page.html, "html.parser")
         text = " ".join(soup.stripped_strings)
-        statuses: list[TicketStatus] = []
-        for day in DAYS:
-            regular = self._day_available(text, day, evening=False)
-            evening = day in EVENING_DAYS and self._day_available(text, day, evening=True)
-            low = self._day_low(text, day)
-            stock = classify_ticket_status(
-                regular_available=regular,
-                evening_available=evening,
-                low_stock=low,
-            )
-            statuses.append(TicketStatus(day, stock, regular, evening, page.url))
-        return statuses
+        return [self._status_for_day(text, day, page.url) for day in DAYS]
+
+    def _status_for_day(self, text: str, day: str, url: str) -> TicketStatus:
+        regular = self._day_available(text, day, evening=False)
+        evening = day in EVENING_DAYS and self._day_available(text, day, evening=True)
+        low = self._day_low(text, day)
+        stock = classify_ticket_status(
+            regular_available=regular,
+            evening_available=evening,
+            low_stock=low,
+        )
+        return TicketStatus(day, stock, regular, evening, url)
 
     @staticmethod
     def _day_available(text: str, day: str, evening: bool) -> bool:
-        day_pattern = re.escape(day)
-        evening_pattern = r"(?:evening|abend)" if evening else r"(?!evening|abend)"
-        sold_pattern = r"(?:sold\s*out|ausverkauft|not\s*available|unavailable)"
-        pattern = rf".{0,120}{day_pattern}.{0,120}{evening_pattern}.{0,120}"
-        match = re.search(pattern, text, re.IGNORECASE)
+        match = re.search(rf".{0,120}{re.escape(day)}.{0,180}", text, re.IGNORECASE)
         if not match:
             return False
-        return not bool(re.search(sold_pattern, match.group(0), re.IGNORECASE))
+        window = match.group(0)
+        if evening and not re.search(r"evening|abend", window, re.IGNORECASE):
+            return False
+        if not evening and re.search(r"evening|abend", window, re.IGNORECASE):
+            return False
+        return not bool(re.search(r"sold\s*out|ausverkauft|not\s*available|unavailable|uitverkocht", window, re.IGNORECASE))
 
     @staticmethod
     def _day_low(text: str, day: str) -> bool:
         match = re.search(rf".{0,160}{re.escape(day)}.{0,160}", text, re.IGNORECASE)
-        if not match:
-            return False
-        return bool(re.search(r"low\s*(?:stock|availability)|limited\s*(?:stock|availability)|geringe\s*(?:verfügbarkeit|anzahl)", match.group(0), re.IGNORECASE))
+        return bool(match and re.search(r"low\s*(?:stock|availability)|limited\s*(?:stock|availability)|geringe\s*(?:verfügbarkeit|anzahl)|lage\s*voorraad", match.group(0), re.IGNORECASE))
 
     def close(self) -> None:
         if self._owns_session:
