@@ -53,6 +53,16 @@ watchers:
   gpu: true
   hardware_retailers: true
 
+market_alerts:
+  window_days: 14
+  explosive_ratio: 1.20
+  ram_segments:
+    - "32GB"
+    - "48GB"
+    - "64GB"
+    - "96GB"
+  gpu_segments: []
+
 steam_price_currencies:
   - EUR
   - UAH
