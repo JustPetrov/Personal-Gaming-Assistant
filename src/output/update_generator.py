@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Iterable
 
 from watchers.change_detection import ChangeType, ObservationChange
@@ -21,21 +20,23 @@ def _change_line(change: ObservationChange) -> str:
     current = change.current or change.previous
     assert current is not None
     name = current.product
-    if change.change_type is ChangeType.NEW:
+    change_type = change.change_type
+    value = getattr(change_type, "value", change_type)
+    if value == ChangeType.NEW.value:
         return f"- 🆕 **{name}** — nieuw"
-    if change.change_type is ChangeType.PRICE_CHANGED:
+    if value == ChangeType.PRICE_CHANGED.value:
         old = change.previous.price if change.previous else "—"
         new = change.current.price if change.current else "—"
         return f"- 💰 **{name}** — {old} → **{new}**"
-    if change.change_type is ChangeType.STOCK_CHANGED:
+    if value == ChangeType.STOCK_CHANGED.value:
         old = change.previous.stock if change.previous else "—"
         new = change.current.stock if change.current else "—"
         return f"- 📦 **{name}** — stock: {old} → **{new}**"
-    if change.change_type is ChangeType.LINK_CHANGED:
+    if value == ChangeType.LINK_CHANGED.value:
         return f"- 🔗 **{name}** — link gewijzigd"
-    if change.change_type is ChangeType.SOURCE_CHANGED:
+    if value == ChangeType.SOURCE_CHANGED.value:
         return f"- 📰 **{name}** — bron gewijzigd"
-    if change.change_type is ChangeType.REMOVED:
+    if value == ChangeType.REMOVED.value:
         return f"- ❌ **{name}** — verdwenen uit de huidige bron"
     return ""
 
