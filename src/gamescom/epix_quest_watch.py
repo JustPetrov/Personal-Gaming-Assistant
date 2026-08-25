@@ -18,32 +18,39 @@ class Quest:
 
 
 def fetch_quests(url: str | None = None) -> list[Quest]:
-    """Fetch the configured EPIX quest page and extract stable quest links.
+    """Fetch EPIX quests with a stable fingerprint per quest.
 
-    The page remains the source of truth; parsing deliberately avoids inventing
-    quest metadata when the source does not expose it.
+    Only quest identity (title + URL) participates in the fingerprint, so
+    unrelated page changes cannot create false alerts.
     """
     target = url or os.getenv("EPIX_QUESTS_URL", DEFAULT_URL)
     request = Request(target, headers={"User-Agent": "Personal-Gaming-Assistant/1.0"})
     with urlopen(request, timeout=30) as response:
         html = response.read().decode("utf-8", errors="replace")
 
-    # Keep the raw page available to the existing parser layer. This watcher
-    # only creates a deterministic page fingerprint until structured parsing
-    # is configured for the current GamesCom markup.
-    fingerprint = hashlib.sha256(html.encode("utf-8")).hexdigest()
-    return [Quest("EPIX Quests", target, fingerprint)]
+    # Import lazily to avoid a parser -> Quest import cycle at module load time.
+    from gamescom.epix_parser import parse_quests
+
+    return parse_quests(html, target)
 
 
 def changed_quests(current: list[Quest], state_path: str = "data/state/epix_quests.json") -> list[Quest]:
-    """Return quests whose source fingerprint changed since the last check."""
+    """Return quests whose stable identity changed since the last check."""
     try:
         previous = json.loads(open(state_path, encoding="utf-8").read())
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, TypeError):
         previous = {}
-    old = previous.get("fingerprints", {})
+
+    old = previous.get("fingerprints", {}) if isinstance(previous, dict) else {}
     changed = [item for item in current if old.get(item.url) != item.fingerprint]
-    os.makedirs(os.path.dirname(state_path), exist_ok=True)
+
+    directory = os.path.dirname(state_path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
     with open(state_path, "w", encoding="utf-8") as handle:
-        json.dump({"fingerprints": {item.url: item.fingerprint for item in current}}, handle, indent=2)
+        json.dump(
+            {"fingerprints": {item.url: item.fingerprint for item in current}},
+            handle,
+            indent=2,
+        )
     return changed
