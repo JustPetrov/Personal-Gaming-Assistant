@@ -1,0 +1,46 @@
+name: Gaming Assistant News
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 08:00 Europe/Amsterdam (CET); DST requires VPS-side scheduling for exact local time
+    - cron: '0 10 * * *'  # 12:00 CET
+    - cron: '0 18 * * *'  # 20:00 CET
+    - cron: '0 20 * * *'  # 22:00 CET - Late Night Round-Up
+  workflow_dispatch:
+    inputs:
+      edition:
+        description: 'Update edition'
+        required: true
+        default: 'update'
+        type: choice
+        options:
+          - update
+          - late-night
+
+concurrency:
+  group: gaming-assistant-news
+  cancel-in-progress: false
+
+jobs:
+  news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate scheduled news update
+        env:
+          OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL }}
+          OLLAMA_MODEL: ${{ secrets.OLLAMA_MODEL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python -m app.news_update --edition "${{ inputs.edition || 'update' }}"
