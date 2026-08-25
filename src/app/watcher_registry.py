@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from datetime import datetime, timezone
 import os
 
 from watchers.price_models import PriceObservation
@@ -16,7 +17,15 @@ def get_fetchers() -> tuple[WatcherFetcher, ...]:
     steam_ids = load_game_watchlist()
     if steam_ids:
         from watchers.steamdb_adapter import SteamDBAdapter
-        fetchers.append(SteamDBAdapter(steam_ids).fetch)
+
+        def steam_price_fetcher() -> Iterable[PriceObservation]:
+            adapter = SteamDBAdapter(steam_ids)
+            try:
+                yield from adapter.fetch()
+            finally:
+                adapter.close()
+
+        fetchers.append(steam_price_fetcher)
 
     if os.getenv("WISHLIST_WATCH_ENABLED", "true").lower() == "true":
         from watchers.wishlist_adapter import WishlistWatcherAdapter
@@ -76,7 +85,7 @@ def get_fetchers() -> tuple[WatcherFetcher, ...]:
                         stock=status.stock.value,
                         url=status.url,
                         source="gamescom official ticket shop",
-                        checked_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+                        checked_at=datetime.now(timezone.utc),
                     )
             finally:
                 client.close()
