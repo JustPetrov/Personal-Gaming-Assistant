@@ -1,0 +1,10 @@
+[Unit]
+Description=Personal Gaming Assistant Email Integration Scanner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/Personal-Gaming-Assistant
+EnvironmentFile=-/Personal-Gaming-Assistant/.env
+ExecStart=/Personal-Gaming-Assistant/.venv/bin/python -m src.run_integrations
