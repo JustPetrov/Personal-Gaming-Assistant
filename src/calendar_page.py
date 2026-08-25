@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from calendar_store import add_event, add_reminder, delete_event, delete_reminder, list_events, list_reminders
-from notifications_api import send_push
+from notifications_api import router as notifications_router, send_push
 
 
 class CalendarEventRequest(BaseModel):
@@ -32,6 +31,8 @@ def _page(body: str) -> str:
 
 
 def register(app):
+    app.include_router(notifications_router)
+
     @app.get("/api/calendar")
     def api_calendar():
         return list_events()
