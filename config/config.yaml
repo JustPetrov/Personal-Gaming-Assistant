@@ -6,9 +6,8 @@ update_times:
   - "22:00"
 late_night_roundup_at: "22:00"
 
-# Steam app IDs monitored by Game Price Watcher.
-# Prices are fetched live from SteamDB in EUR and UAH.
 steam_app_ids: []
+hardware_products: []
 
 sources:
   steam_price_primary: steamdb
@@ -33,6 +32,7 @@ watchers:
   wishlist: true
   ram: true
   gpu: true
+  hardware_retailers: true
 
 steam_price_currencies:
   - EUR
