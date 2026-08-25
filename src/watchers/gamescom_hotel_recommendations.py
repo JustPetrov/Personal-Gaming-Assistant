@@ -11,16 +11,15 @@ class HotelRecommendation:
     price_per_night: Decimal | None
     rating: float | None
     distance_to_koelnmesse_m: int | None
-    location: str | None
     url: str | None
     reason: str
+    location: str | None = None
 
 
 def _quality_score(o: HotelRecommendation) -> Decimal:
     rating = Decimal(str(o.rating or 0))
     distance = Decimal(str(o.distance_to_koelnmesse_m or 5000))
     price = o.price_per_night or Decimal("9999")
-    # Strong quality signal from rating, then price and practical proximity.
     return rating * Decimal("20") - price * Decimal("0.10") - distance / Decimal("500")
 
 
@@ -29,13 +28,7 @@ def rank_hotels(
     *,
     alternative_radius_km: float = 40.0,
 ) -> tuple[HotelRecommendation | None, HotelRecommendation | None]:
-    """Return best price/quality in Cologne and a cheaper regional alternative.
-
-    The primary recommendation is restricted to Cologne. The alternative may
-    be in Cologne or nearby towns/cities within the configured radius. A
-    missing price is never interpreted as free and a missing rating is never
-    interpreted as a positive rating.
-    """
+    """Return best price/quality in Cologne and a cheaper regional alternative."""
     priced = [o for o in offers if o.price_per_night is not None]
     if not priced:
         return None, None
@@ -44,9 +37,6 @@ def rank_hotels(
     best_pool = cologne or priced
     best = max(best_pool, key=_quality_score)
 
-    # Nearby alternatives are accepted even when they are outside Cologne.
-    # Distance to Koelnmesse is the canonical travel-distance field; when it is
-    # missing, the offer is excluded rather than guessed into the radius.
     radius_m = int(alternative_radius_km * 1000)
     alternatives = [
         o for o in priced
