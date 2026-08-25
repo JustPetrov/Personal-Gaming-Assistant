@@ -47,7 +47,15 @@ def get_fetchers() -> tuple[WatcherFetcher, ...]:
     hardware_queries = _csv("HARDWARE_WATCH_QUERIES")
     if hardware_queries:
         from watchers.hardware_retailer_adapter import HardwareRetailerAdapter
-        fetchers.append(HardwareRetailerAdapter(hardware_queries).fetch)
+
+        def hardware_price_fetcher() -> Iterable[PriceObservation]:
+            adapter = HardwareRetailerAdapter(hardware_queries)
+            try:
+                yield from adapter.fetch()
+            finally:
+                adapter.close()
+
+        fetchers.append(hardware_price_fetcher)
 
     tweakers_urls = _csv("TWEAKERS_PRICE_HISTORY_URLS")
     if tweakers_urls:
