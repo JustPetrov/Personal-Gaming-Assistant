@@ -4,3 +4,5 @@ beautifulsoup4>=4.12,<5
 feedparser>=6.0,<7
 PyYAML>=6.0,<7
 python-dotenv>=1.0,<2
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
