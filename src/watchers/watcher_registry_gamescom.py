@@ -12,6 +12,8 @@ from .gamescom_registry_watchers import (
     ticket_alerts,
 )
 from .gamescom_hotel_recommendations import HotelRecommendation, rank_hotels
+from .gamescom_ticket_live import GamesComTicketLiveClient
+from .gamescom_ticket_stock import TicketStatus
 
 
 def get_gamescom_fetchers() -> tuple[Callable[[], Iterable[dict]], ...]:
@@ -28,7 +30,6 @@ def get_gamescom_fetchers() -> tuple[Callable[[], Iterable[dict]], ...]:
 
 
 def _announcement_fetcher() -> Iterable[dict]:
-    """Adapter hook for the live GamesCom announcement client."""
     return announcement_observations(GamesComAnnouncementStatus(
         ticket_sales_started=False,
         epix_started=False,
@@ -38,9 +39,27 @@ def _announcement_fetcher() -> Iterable[dict]:
 
 
 def _ticket_stock_fetcher() -> Iterable[dict]:
-    """Adapter hook for live ticket-stock results."""
-    # The dedicated ticket client is handled by app.monitoring_cycle.
-    return ()
+    """Fetch official GamesCom ticket stock as normalized observations."""
+    client = GamesComTicketLiveClient()
+    try:
+        statuses: list[TicketStatus] = client.fetch_statuses()
+        for status in statuses:
+            yield {
+                "type": "gamescom_ticket_status",
+                "product": f"GamesCom Ticket {status.day}",
+                "platform": "gamescom",
+                "edition": "Evening" if status.evening_available and not status.regular_available else "Regular",
+                "price": None,
+                "currency": None,
+                "stock": status.stock.value,
+                "regular_available": status.regular_available,
+                "evening_available": status.evening_available,
+                "url": status.url,
+                "source": "gamescom official ticket shop",
+                "day": status.day,
+            }
+    finally:
+        client.close()
 
 
 def _hotel_check_dates() -> tuple[date, date] | None:
@@ -60,7 +79,6 @@ def _hotel_check_dates() -> tuple[date, date] | None:
 
 
 def _hotel_to_recommendation(offer: HotelOffer) -> HotelRecommendation:
-    """Normalize a live offer into the shared recommendation model."""
     from decimal import Decimal, InvalidOperation
 
     price: Decimal | None = None
@@ -91,25 +109,19 @@ def _hotel_recommendation_fetcher() -> Iterable[dict]:
 
     check_in, check_out = dates
     offers: list[HotelOffer] = []
-    clients = GamesComHotelLiveClient.configured_clients()
-    for client in clients:
+    for client in GamesComHotelLiveClient.configured_clients():
         try:
             offers.extend(client.fetch(check_in, check_out))
         except Exception:
-            # A broken provider must not suppress other providers or create fake data.
             continue
 
     recommendations = [_hotel_to_recommendation(offer) for offer in offers]
     best, cheaper = rank_hotels(recommendations)
-
     selected: list[tuple[str, HotelRecommendation]] = []
     if best is not None:
         selected.append(("Beste prijs/kwaliteit", best))
     if cheaper is not None and (best is None or cheaper.name != best.name):
         selected.append(("Goedkoper alternatief", cheaper))
-
-    # When ranking cannot score a live offer yet, retain every verified offer
-    # rather than returning an empty result.
     if not selected:
         selected = [("Live hotel offer", item) for item in recommendations if item.url]
 
