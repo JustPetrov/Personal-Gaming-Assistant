@@ -16,14 +16,7 @@ class WatcherRunResult:
 
 
 class WatcherPipeline:
-    """Run a watcher against its own persistent snapshot scope.
-
-    Production callers should pass an explicit ``scope`` when one logical
-    watcher is represented by multiple callable objects. When no scope is
-    supplied, runs share a default snapshot so stateful callback sequences
-    continue to compare against the previous run. Production code should use
-    explicit scopes for independent watchers.
-    """
+    """Run a watcher against a persistent snapshot scope."""
 
     def __init__(self, store: ObservationStore):
         self.store = store
@@ -41,6 +34,13 @@ class WatcherPipeline:
         *,
         scope: str | None = None,
     ) -> WatcherRunResult:
+        """Run a fetcher against a stable snapshot.
+
+        Without an explicit scope, runs intentionally share ``default`` so a
+        sequence of callback objects can represent successive observations of
+        one logical watcher. Production callers that need independent watcher
+        state should provide an explicit ``scope``.
+        """
         watcher_scope = scope or "default"
         previous = self.store.load(watcher_scope)
         current = normalize_observations(fetcher())
