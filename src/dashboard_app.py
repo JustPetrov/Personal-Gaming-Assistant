@@ -19,3 +19,5 @@ from calendar_page import register as register_calendar  # noqa: E402
 register_calendar(app)
 from steam_stats_page import register as register_steam_stats  # noqa: E402
 register_steam_stats(app)
+from integrations_page import register as register_integrations  # noqa: E402
+register_integrations(app)
