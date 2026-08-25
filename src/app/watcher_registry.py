@@ -34,7 +34,15 @@ def get_fetchers() -> tuple[WatcherFetcher, ...]:
     ps_urls = _csv("PS_STORE_URLS")
     if ps_urls:
         from watchers.ps_store_adapter import PlayStationStoreAdapter
-        fetchers.append(PlayStationStoreAdapter(ps_urls).fetch)
+
+        def ps_store_price_fetcher() -> Iterable[PriceObservation]:
+            adapter = PlayStationStoreAdapter(ps_urls)
+            try:
+                yield from adapter.fetch()
+            finally:
+                adapter.close()
+
+        fetchers.append(ps_store_price_fetcher)
 
     hardware_queries = _csv("HARDWARE_WATCH_QUERIES")
     if hardware_queries:
