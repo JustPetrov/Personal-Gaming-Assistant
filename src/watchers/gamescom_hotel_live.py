@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal, InvalidOperation
 import os
 import re
 from urllib.parse import urljoin
@@ -20,6 +21,20 @@ class HotelOffer:
     availability: str
     url: str
     source: str
+
+    @property
+    def nights(self) -> int:
+        return max(0, (self.check_out - self.check_in).days)
+
+    @property
+    def total_price(self) -> Decimal | None:
+        if self.price is None or self.nights <= 0:
+            return None
+        try:
+            raw = self.price.replace("€", "").replace(" ", "").replace(".", "").replace(",", ".")
+            return Decimal(raw) * self.nights
+        except (InvalidOperation, ValueError):
+            return None
 
 
 class GamesComHotelLiveClient:
