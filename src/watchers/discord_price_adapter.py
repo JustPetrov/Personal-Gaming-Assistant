@@ -30,21 +30,28 @@ class DiscordPriceAdapter:
 
     def fetch(self) -> list[PriceObservation]:
         observations: list[PriceObservation] = []
-        for product, duration, multiplier in DISCORD_OFFERS:
-            query = f"Discord {product} {duration}"
-            for listing in self.client.search(query):
-                price = self._scaled_price(listing.price, multiplier)
-                observations.append(observation_from_values(
-                    product=product,
-                    platform="Discord",
-                    edition=duration,
-                    price=price,
-                    currency=listing.currency,
-                    stock=listing.stock,
-                    url=listing.url,
-                    source="G2G",
-                ))
-        return observations
+        try:
+            for product, duration, multiplier in DISCORD_OFFERS:
+                query = f"Discord {product} {duration}"
+                for listing in self.client.search(query):
+                    price = self._scaled_price(listing.price, multiplier)
+                    observations.append(
+                        observation_from_values(
+                            product=product,
+                            platform="Discord",
+                            edition=duration,
+                            price=price,
+                            currency=listing.currency,
+                            stock=listing.stock,
+                            url=listing.url,
+                            source="G2G",
+                        )
+                    )
+            return observations
+        finally:
+            # The registry creates one adapter per monitoring cycle. Close
+            # adapter-owned HTTP/session resources after every cycle.
+            self.close()
 
     @staticmethod
     def _scaled_price(price: str | None, multiplier: int) -> str | None:
