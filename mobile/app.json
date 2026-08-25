@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Personal Gaming Assistant",
+    "slug": "personal-gaming-assistant",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "android": {"package": "com.justpetrov.personalassistant"},
+    "ios": {"bundleIdentifier": "com.justpetrov.personalassistant"},
+    "plugins": ["expo-notifications"]
+  }
+}
