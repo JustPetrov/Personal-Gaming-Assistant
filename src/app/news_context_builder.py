@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
+import os
 
 from app.game_price_news import build_game_price_news
 from app.market_alert_observations import market_alert_observations
@@ -24,6 +26,11 @@ def _observation_fingerprint(item: dict[str, Any]) -> str:
         item.get("url"),
     )
     return "|".join("" if value is None else str(value) for value in parts)
+
+
+def _local_date() -> str:
+    timezone_name = os.getenv("TIMEZONE", "Europe/Amsterdam")
+    return datetime.now(ZoneInfo(timezone_name)).date().isoformat()
 
 
 def _merge_daily_observations(observations: list[dict[str, Any]], day: str) -> list[dict[str, Any]]:
@@ -50,14 +57,13 @@ def build_news_context_from_observations(
 ) -> dict[str, Any]:
     """Build one fact-only payload for the Ollama news writer.
 
-    Late-night editions intentionally reconstruct the current day from
+    Late-night editions intentionally reconstruct the current local day from
     persistent observation history so the 22:00 round-up covers the whole day.
     """
     ram_item_ids = ram_item_ids or []
     gpu_item_ids = gpu_item_ids or []
     if edition == "late-night":
-        day = datetime.now(timezone.utc).date().isoformat()
-        observations = _merge_daily_observations(observations, day)
+        observations = _merge_daily_observations(observations, _local_date())
 
     history = PriceHistory()
     game_prices = build_game_price_news(observations)
