@@ -1,0 +1,55 @@
+timezone: Europe/Amsterdam
+update_times:
+  - "08:00"
+  - "12:00"
+  - "20:00"
+  - "22:00"
+late_night_roundup_at: "22:00"
+
+sources:
+  steam_price_primary: steamdb
+  steam_store: steam
+  hardware:
+    - tweakers
+    - bol
+    - azerty
+    - alternate
+    - megekko
+    - amazon_nl
+  gpu_ram: toms_hardware
+
+watchers:
+  gamescom: true
+  hotel: true
+  tickets: true
+  steam_games: true
+  ps5_games: true
+  uah_deals: true
+  discord: true
+  wishlist: true
+  ram: true
+  gpu: true
+
+steam_price_currencies:
+  - EUR
+  - UAH
+
+discord:
+  boosts:
+    - months: 1
+      quantity: 14
+    - months: 3
+      quantity: 14
+  nitro:
+    - months: 1
+    - months: 12
+  nitro_basic:
+    - months: 1
+    - months: 12
+
+output:
+  require_current_price: true
+  require_stock: true
+  require_link: true
+  require_source: true
+  hide_removed_items_from_updates: true
