@@ -27,6 +27,26 @@ def get_fetchers() -> tuple[WatcherFetcher, ...]:
         from watchers.hardware_retailer_adapter import HardwareRetailerAdapter
         fetchers.append(HardwareRetailerAdapter(hardware_queries).fetch)
 
+    tweakers_urls = _csv("TWEAKERS_PRICE_HISTORY_URLS")
+    if tweakers_urls:
+        from watchers.tweakers_price_history import TweakersPriceHistoryClient
+
+        def tweakers_price_fetcher() -> Iterable[PriceObservation]:
+            for point in TweakersPriceHistoryClient(tweakers_urls).fetch():
+                yield PriceObservation(
+                    product=point.product,
+                    platform="Tweakers",
+                    edition=None,
+                    price=point.price,
+                    currency=point.currency,
+                    stock=None,
+                    url=point.url,
+                    source=point.source,
+                    checked_at=point.checked_at,
+                )
+
+        fetchers.append(tweakers_price_fetcher)
+
     if os.getenv("DISCORD_PRICE_WATCH_ENABLED", "false").lower() == "true":
         from watchers.discord_price_adapter import DiscordPriceAdapter
         fetchers.append(DiscordPriceAdapter().fetch)
@@ -37,7 +57,6 @@ def get_fetchers() -> tuple[WatcherFetcher, ...]:
 
     if os.getenv("GAMESCOM_TICKET_WATCH_ENABLED", "true").lower() == "true":
         from watchers.gamescom_ticket_live import GamesComTicketLiveClient
-        from watchers.gamescom_ticket_stock import stock_alert
 
         def gamescom_ticket_fetcher() -> Iterable[PriceObservation]:
             client = GamesComTicketLiveClient()
