@@ -30,7 +30,6 @@ def _watcher_name(fetcher) -> str:
 
 
 def _watcher_error(fetcher, exc: Exception) -> dict:
-    """Build a consistent, non-fatal watcher error observation."""
     return {
         "type": "watcher_error",
         "source": _watcher_name(fetcher),
@@ -66,10 +65,7 @@ def collect_observations() -> list[dict]:
     except Exception as exc:
         observations.append(_watcher_error(collect_epix_observations, exc))
 
-    ticket_statuses = [
-        item for item in observations
-        if item.get("type") == "gamescom_ticket_status"
-    ]
+    ticket_statuses = [item for item in observations if item.get("type") == "gamescom_ticket_status"]
     if ticket_statuses:
         try:
             for alert in monitor_stock(ticket_statuses):
@@ -86,7 +82,7 @@ def collect_observations() -> list[dict]:
 
 
 def _publish_dashboard_state(observations: list[dict], changed: list[dict], started: str) -> None:
-    """Publish the latest monitoring cycle in the JSON files consumed by the dashboard."""
+    """Publish the latest monitoring cycle in the JSON files consumed by the dashboards."""
     DATA.mkdir(parents=True, exist_ok=True)
 
     gamescom_events = [
@@ -98,6 +94,18 @@ def _publish_dashboard_state(observations: list[dict], changed: list[dict], star
         write_dashboard_data(gamescom_events)
     except Exception as exc:
         print(f"GamesCom dashboard sync failed: {exc}")
+
+    # Persist the full non-price observation stream so dedicated watcher pages
+    # can show EPIX, tickets, announcements and errors without inventing data.
+    watcher_path = DATA / "watcher_state.json"
+    watcher_state = {
+        "last_synced": started,
+        "observations": observations[-500:],
+    }
+    watcher_path.write_text(
+        json.dumps(watcher_state, ensure_ascii=False, indent=2, default=str),
+        encoding="utf-8",
+    )
 
     prices = [
         {
@@ -114,7 +122,6 @@ def _publish_dashboard_state(observations: list[dict], changed: list[dict], star
         if item.get("price") is not None and (item.get("product") or item.get("title") or item.get("name"))
     ]
 
-    # Keep only the newest observation for each dashboard row.
     latest: dict[tuple, dict] = {}
     for item in prices:
         key = (item.get("product"), item.get("platform"), item.get("source"))
@@ -140,14 +147,10 @@ def _publish_dashboard_state(observations: list[dict], changed: list[dict], star
         "changes": len(changed),
         "gamescom_items": len(gamescom_events),
     })
-    updates_path.write_text(
-        json.dumps(updates[-100:], ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    updates_path.write_text(json.dumps(updates[-100:], ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def run_monitoring_cycle() -> list[dict]:
-    """Collect observations, persist price history, publish dashboard state, then emit changes."""
     started = datetime.now(timezone.utc).isoformat()
     observations = collect_observations()
     persisted = persist_price_observations(observations)
