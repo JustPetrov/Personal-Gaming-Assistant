@@ -49,16 +49,11 @@ def choose_cheapest(routes: list[CreditRoute]) -> CreditRoute | None:
 
 
 def required_gift_card_amount(price_uah: int, denominations: Iterable[int]) -> int | None:
-    """Return the smallest configured denomination that covers the Steam price."""
     valid = sorted(amount for amount in denominations if amount >= price_uah)
     return valid[0] if valid else None
 
 
-def find_best_uah_offer(
-    price_uah: int,
-    offers: Iterable[GiftCardOffer],
-    denominations: Iterable[int],
-) -> UAHDealResult | None:
+def find_best_uah_offer(price_uah: int, offers: Iterable[GiftCardOffer], denominations: Iterable[int]) -> UAHDealResult | None:
     required = required_gift_card_amount(price_uah, denominations)
     if required is None:
         return None
@@ -66,16 +61,10 @@ def find_best_uah_offer(
     if not candidates:
         return None
     best = min(candidates, key=lambda offer: offer.price + offer.fees)
-    return UAHDealResult(
-        steam_price_uah=price_uah,
-        required_card_uah=required,
-        offer=best,
-        total_cost=best.price + best.fees,
-    )
+    return UAHDealResult(price_uah, required, best, best.price + best.fees)
 
 
 def parse_uah_amount(value: str | int) -> int | None:
-    """Parse a UAH price such as '899₴' into an integer amount."""
     try:
         text = str(value).replace("₴", "").replace("UAH", "").replace(" ", "")
         return int(Decimal(text.replace(",", ".")))
@@ -83,13 +72,32 @@ def parse_uah_amount(value: str | int) -> int | None:
         return None
 
 
-def build_uah_deal_from_steamdb(
-    steam_uah: str | int,
-    offers: Iterable[GiftCardOffer],
-    denominations: Iterable[int],
-) -> UAHDealResult | None:
-    """Bridge a SteamDB UAH price into the Gift Card comparison engine."""
+def build_uah_deal_from_steamdb(steam_uah: str | int, offers: Iterable[GiftCardOffer], denominations: Iterable[int]) -> UAHDealResult | None:
     amount = parse_uah_amount(steam_uah)
     if amount is None:
         return None
     return find_best_uah_offer(amount, offers, denominations)
+
+
+def verified_uah_game_deals(prices: Iterable[dict], *, limit: int = 10) -> list[dict]:
+    """Return only games with verified Steam EUR + UAH prices."""
+    valid = []
+    for raw in prices:
+        try:
+            app_id = int(raw["app_id"])
+            eur = float(raw["eur_price"])
+            uah = float(raw["uah_price"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if eur <= 0 or uah <= 0:
+            continue
+        valid.append({
+            "app_id": app_id,
+            "title": str(raw.get("title") or "Unknown game"),
+            "eur_price": eur,
+            "uah_price": uah,
+            "ratio": uah / eur,
+            "url": str(raw.get("url") or f"https://steamdb.info/app/{app_id}/"),
+            "source": "SteamDB",
+        })
+    return sorted(valid, key=lambda item: item["ratio"])[:limit]
