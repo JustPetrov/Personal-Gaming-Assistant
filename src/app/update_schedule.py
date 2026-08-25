@@ -12,14 +12,20 @@ class ScheduledUpdate:
     name: str
     hour: int
     minute: int = 0
-    style: str = "compact Dutch gaming assistant update"
+    style: str = "compact Dutch gaming assistant update with a short Round-Up"
+    daily_window_hours: int = 4
 
 
 SCHEDULE = (
-    ScheduledUpdate("morning", 8),
-    ScheduledUpdate("noon", 12),
-    ScheduledUpdate("evening", 20),
-    ScheduledUpdate("late_night_roundup", 22, style="compact Dutch late-night gaming roundup"),
+    ScheduledUpdate("morning", 8, style="compact Dutch gaming assistant update; end with a short Round-Up"),
+    ScheduledUpdate("noon", 12, style="compact Dutch gaming assistant update; end with a short Round-Up"),
+    ScheduledUpdate("evening", 20, style="compact Dutch gaming assistant update; end with a short Round-Up"),
+    ScheduledUpdate(
+        "late_night",
+        22,
+        style="Dutch Late Night Update with an expanded Late Night Round-Up covering the whole day",
+        daily_window_hours=24,
+    ),
 )
 
 
