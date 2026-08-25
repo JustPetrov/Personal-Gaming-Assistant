@@ -9,6 +9,25 @@ late_night_roundup_at: "22:00"
 steam_app_ids: []
 hardware_products: []
 
+ollama:
+  base_url: "http://ollama:11434"
+  model: "llama3.2"
+  web_research: true
+  max_source_chars: 20000
+
+ai_web_sources:
+  - "https://steamdb.info/"
+  - "https://store.steampowered.com/"
+  - "https://store.playstation.com/nl-nl/"
+  - "https://tweakers.net/pricewatch/"
+  - "https://www.bol.com/nl/nl/"
+  - "https://azerty.nl/"
+  - "https://www.alternate.nl/"
+  - "https://www.megekko.nl/"
+  - "https://www.amazon.nl/"
+  - "https://www.g2g.com/"
+  - "https://www.gamescom.global/"
+
 sources:
   steam_price_primary: steamdb
   steam_store: steam
