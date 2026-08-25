@@ -35,6 +35,30 @@ def get_fetchers() -> tuple[WatcherFetcher, ...]:
         from watchers.gamescom_registry_adapters import epix_quest_fetcher
         fetchers.append(epix_quest_fetcher)
 
+    if os.getenv("GAMESCOM_TICKET_WATCH_ENABLED", "true").lower() == "true":
+        from watchers.gamescom_ticket_live import GamesComTicketLiveClient
+        from watchers.gamescom_ticket_stock import stock_alert
+
+        def gamescom_ticket_fetcher() -> Iterable[PriceObservation]:
+            client = GamesComTicketLiveClient()
+            try:
+                for status in client.fetch_statuses():
+                    yield PriceObservation(
+                        product=f"GamesCom Ticket {status.day}",
+                        platform="gamescom",
+                        edition="Evening" if status.evening_available and not status.regular_available else "Regular",
+                        price=None,
+                        currency=None,
+                        stock=status.stock.value,
+                        url=status.url,
+                        source="gamescom official ticket shop",
+                        checked_at=None,
+                    )
+            finally:
+                client.close()
+
+        fetchers.append(gamescom_ticket_fetcher)
+
     return tuple(fetchers)
 
 
