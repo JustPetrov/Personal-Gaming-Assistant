@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
+from pathlib import Path
 
 from app.watcher_registry import get_fetchers
 from storage.change_detection import ChangeDetector
@@ -10,6 +12,9 @@ from watchers.watcher_registry_gamescom import get_gamescom_fetchers
 from gamescom.stock_monitor import monitor_stock
 from gamescom.epix_observations import collect_epix_observations
 from gamescom.discord_epix_alerts import send_epix_alerts
+
+ROOT = Path(__file__).resolve().parents[2]
+DATA = ROOT / "data"
 
 
 def _watcher_name(fetcher) -> str:
@@ -79,12 +84,63 @@ def collect_observations() -> list[dict]:
     return observations
 
 
+def _publish_dashboard_state(observations: list[dict], changed: list[dict], started: str) -> None:
+    """Publish the latest monitoring cycle in the JSON files consumed by the dashboard."""
+    DATA.mkdir(parents=True, exist_ok=True)
+
+    prices = [
+        {
+            "product": item.get("product") or item.get("title") or item.get("name"),
+            "platform": item.get("platform"),
+            "price": item.get("price"),
+            "currency": item.get("currency") or "EUR",
+            "stock": item.get("stock"),
+            "source": item.get("source"),
+            "url": item.get("url"),
+            "checked_at": item.get("checked_at") or started,
+        }
+        for item in observations
+        if item.get("price") is not None and (item.get("product") or item.get("title") or item.get("name"))
+    ]
+
+    # Keep only the newest observation for each dashboard row.
+    latest: dict[tuple, dict] = {}
+    for item in prices:
+        key = (item.get("product"), item.get("platform"), item.get("source"))
+        latest[key] = item
+    (DATA / "prices.json").write_text(
+        json.dumps(list(latest.values()), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    updates_path = DATA / "updates.json"
+    try:
+        updates = json.loads(updates_path.read_text(encoding="utf-8")) if updates_path.exists() else []
+        if not isinstance(updates, list):
+            updates = []
+    except (OSError, json.JSONDecodeError):
+        updates = []
+    updates.append({
+        "timestamp": started,
+        "type": "monitoring",
+        "status": "completed",
+        "items_checked": len(observations),
+        "price_items": len(prices),
+        "changes": len(changed),
+    })
+    updates_path.write_text(
+        json.dumps(updates[-100:], ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
 def run_monitoring_cycle() -> list[dict]:
-    """Collect observations, persist price history, then emit changes."""
+    """Collect observations, persist price history, publish dashboard state, then emit changes."""
     started = datetime.now(timezone.utc).isoformat()
     observations = collect_observations()
     persisted = persist_price_observations(observations)
     changed = ChangeDetector().process(observations)
+    _publish_dashboard_state(observations, changed, started)
     print(
         f"Monitoring cycle started={started} "
         f"observations={len(observations)} prices_persisted={persisted} changes={len(changed)}"
