@@ -62,18 +62,24 @@ def get_fetchers() -> tuple[WatcherFetcher, ...]:
         from watchers.tweakers_price_history import TweakersPriceHistoryClient
 
         def tweakers_price_fetcher() -> Iterable[PriceObservation]:
-            for point in TweakersPriceHistoryClient(tweakers_urls).fetch():
-                yield PriceObservation(
-                    product=point.product,
-                    platform="Tweakers",
-                    edition=None,
-                    price=point.price,
-                    currency=point.currency,
-                    stock=None,
-                    url=point.url,
-                    source=point.source,
-                    checked_at=point.checked_at,
-                )
+            client = TweakersPriceHistoryClient(tweakers_urls)
+            try:
+                for point in client.fetch():
+                    yield PriceObservation(
+                        product=point.product,
+                        platform="Tweakers",
+                        edition=None,
+                        price=point.price,
+                        currency=point.currency,
+                        stock=None,
+                        url=point.url,
+                        source=point.source,
+                        checked_at=point.checked_at,
+                    )
+            finally:
+                close = getattr(client, "close", None)
+                if callable(close):
+                    close()
 
         fetchers.append(tweakers_price_fetcher)
 
