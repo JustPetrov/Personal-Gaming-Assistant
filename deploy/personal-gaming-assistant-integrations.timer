@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Personal Gaming Assistant email integration scanner every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=personal-gaming-assistant-integrations.service
+
+[Install]
+WantedBy=timers.target
