@@ -7,6 +7,7 @@ from storage.change_detection import ChangeDetector
 from storage.history_ingest import persist_price_observations
 from watchers.hardware_source_dispatcher import configured_hardware_observations
 from watchers.watcher_registry_gamescom import get_gamescom_fetchers
+from gamescom.stock_monitor import monitor_stock
 
 
 def collect_observations() -> list[dict]:
@@ -23,8 +24,6 @@ def collect_observations() -> list[dict]:
                 "error": str(exc),
             })
 
-    # Hardware retailers are dispatched separately so each concrete source
-    # is preserved in the resulting PriceObservation/history records.
     try:
         observations.extend(dict(item) for item in configured_hardware_observations())
     except Exception as exc:
@@ -33,6 +32,22 @@ def collect_observations() -> list[dict]:
             "source": "configured_hardware_observations",
             "error": str(exc),
         })
+
+    # Ticket stock is handled as a stateful alert stream. Keep the live
+    # observations in the normal payload while only emitting changed alerts.
+    ticket_statuses = [
+        item for item in observations
+        if item.get("type") == "gamescom_ticket_status"
+    ]
+    if ticket_statuses:
+        for alert in monitor_stock(ticket_statuses):
+            observations.append({
+                "type": "gamescom_stock_alert",
+                "day": alert.day,
+                "ticket_type": alert.ticket_type,
+                "status": alert.status.value,
+                "message": alert.message,
+            })
     return observations
 
 
