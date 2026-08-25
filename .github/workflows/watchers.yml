@@ -1,0 +1,45 @@
+name: Gaming Assistant Watchers
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: gaming-assistant-watchers
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run watcher cycle
+        env:
+          PYTHONPATH: src
+        run: python -m app.watch_cycle
+
+      - name: Persist watcher state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/state
+          if git diff --cached --quiet; then
+            echo "No state changes."
+          else
+            git commit -m "Update watcher state"
+            git push
+          fi
