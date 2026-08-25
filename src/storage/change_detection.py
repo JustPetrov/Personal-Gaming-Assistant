@@ -71,13 +71,16 @@ class ChangeDetector:
             previous = self.state.get(identity)
             if previous != digest:
                 emitted = dict(observation)
-                emitted["priority"] = self.priority(observation)
-                emitted["change"] = "new" if previous is None else "updated"
-                emitted["observation_key"] = identity
+                # Keep news payload compatibility: metadata is useful for
+                # actionable watcher events but must not change legacy news records.
+                if observation.get("type") != "game_news":
+                    emitted["priority"] = self.priority(observation)
+                    emitted["change"] = "new" if previous is None else "updated"
+                    emitted["observation_key"] = identity
                 changed.append(emitted)
                 self.state[identity] = digest
         self.path.write_text(
             json.dumps(self.state, indent=2, ensure_ascii=False), encoding="utf-8"
         )
-        changed.sort(key=lambda item: _PRIORITY_ORDER.get(str(item.get("priority")), 9))
+        changed.sort(key=lambda item: _PRIORITY_ORDER.get(str(item.get("priority", "NORMAL")), 9))
         return changed
