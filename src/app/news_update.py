@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime, timezone
 
 from app.discord_news import send_news
+from app.local_datetime import news_datetime
 from app.news_context_builder import build_news_context_from_observations
 from app.ollama_news import write_news
 from app.monitoring_cycle import collect_observations
@@ -25,13 +26,17 @@ SECTIONS = (
 def build_news_context(*, edition: str = "update", observations: list[dict] | None = None) -> dict:
     """Build the complete fact-based context consumed by Ollama."""
     observations = observations if observations is not None else collect_observations()
+    local = news_datetime()
     context = build_news_context_from_observations(observations, edition=edition)
     context.update({
         "title_suffix": "Late Night Update" if edition == "late-night" else "Update",
         "round_up_label": "Late Night Round-Up" if edition == "late-night" else "Round-Up",
         "sections": list(SECTIONS),
         "late_night": edition == "late-night",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": local["iso"],
+        "local_date": local["date"],
+        "local_time": local["time"],
+        "timezone": local["timezone"],
     })
     return context
 
