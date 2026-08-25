@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 
-@dataclass
+@dataclass(eq=False)
 class PriceObservation:
     product: str
     platform: str
@@ -15,6 +15,18 @@ class PriceObservation:
     url: str | None
     source: str
     checked_at: datetime
+
+    def __eq__(self, other: object) -> bool:
+        if not hasattr(other, "__dict__"):
+            return NotImplemented
+        fields = (
+            "product", "platform", "edition", "price", "currency",
+            "stock", "url", "source", "checked_at",
+        )
+        return all(
+            getattr(self, field, object()) == getattr(other, field, object())
+            for field in fields
+        )
 
 
 @dataclass
