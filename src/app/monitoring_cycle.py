@@ -5,13 +5,15 @@ from datetime import datetime, timezone
 from app.watcher_registry import get_fetchers
 from storage.change_detection import ChangeDetector
 from storage.history_ingest import persist_price_observations
+from watchers.hardware_source_dispatcher import configured_hardware_observations
 from watchers.watcher_registry_gamescom import get_gamescom_fetchers
 
 
 def collect_observations() -> list[dict]:
     """Collect every enabled watcher result for one monitoring cycle."""
     observations: list[dict] = []
-    for fetcher in (*get_fetchers(), *get_gamescom_fetchers()):
+    fetchers = (*get_fetchers(), *get_gamescom_fetchers())
+    for fetcher in fetchers:
         try:
             observations.extend(dict(item) for item in fetcher())
         except Exception as exc:
@@ -20,6 +22,17 @@ def collect_observations() -> list[dict]:
                 "source": getattr(fetcher, "__name__", "unknown"),
                 "error": str(exc),
             })
+
+    # Hardware retailers are dispatched separately so each concrete source
+    # is preserved in the resulting PriceObservation/history records.
+    try:
+        observations.extend(dict(item) for item in configured_hardware_observations())
+    except Exception as exc:
+        observations.append({
+            "type": "watcher_error",
+            "source": "configured_hardware_observations",
+            "error": str(exc),
+        })
     return observations
 
 
