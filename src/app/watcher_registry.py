@@ -18,6 +18,10 @@ def get_fetchers() -> tuple[WatcherFetcher, ...]:
         from watchers.steamdb_adapter import SteamDBAdapter
         fetchers.append(SteamDBAdapter(steam_ids).fetch)
 
+    if os.getenv("WISHLIST_WATCH_ENABLED", "true").lower() == "true":
+        from watchers.wishlist_adapter import WishlistWatcherAdapter
+        fetchers.append(WishlistWatcherAdapter().fetch)
+
     ps_urls = _csv("PS_STORE_URLS")
     if ps_urls:
         from watchers.ps_store_adapter import PlayStationStoreAdapter
@@ -72,7 +76,7 @@ def get_fetchers() -> tuple[WatcherFetcher, ...]:
                         stock=status.stock.value,
                         url=status.url,
                         source="gamescom official ticket shop",
-                        checked_at=None,
+                        checked_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),
                     )
             finally:
                 client.close()
