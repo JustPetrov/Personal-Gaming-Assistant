@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from app.watcher_registry import get_fetchers
 from storage.change_detection import ChangeDetector
+from storage.history_ingest import persist_price_observations
 from watchers.watcher_registry_gamescom import get_gamescom_fetchers
 
 
@@ -23,13 +24,14 @@ def collect_observations() -> list[dict]:
 
 
 def run_monitoring_cycle() -> list[dict]:
-    """Collect observations and return only new/changed facts."""
+    """Collect observations, persist price history, then emit changes."""
     started = datetime.now(timezone.utc).isoformat()
     observations = collect_observations()
+    persisted = persist_price_observations(observations)
     changed = ChangeDetector().process(observations)
     print(
         f"Monitoring cycle started={started} "
-        f"observations={len(observations)} changes={len(changed)}"
+        f"observations={len(observations)} prices_persisted={persisted} changes={len(changed)}"
     )
     return changed
 
