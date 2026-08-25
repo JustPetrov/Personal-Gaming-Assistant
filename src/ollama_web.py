@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable
+import os
 
 import httpx
 
@@ -15,18 +16,15 @@ class WebSource:
 
 
 class WebContext:
-    """Small web-retrieval layer used before sending a question to Ollama.
+    """Retrieve public web context before asking the local Ollama model.
 
-    Ollama is the local model/runtime; it does not magically browse the web.
-    This layer retrieves public pages/APIs and passes the resulting context to Ollama.
+    Ollama is the local model/runtime. It does not itself provide unrestricted
+    web browsing, so this layer performs the network retrieval and passes the
+    retrieved context to Ollama.
     """
 
     def __init__(self, timeout: float = 20.0):
-        self.client = httpx.Client(
-            timeout=timeout,
-            follow_redirects=True,
-            headers={"User-Agent": "Personal-Gaming-Assistant/1.0"},
-        )
+        self.client = httpx.Client(timeout=timeout, follow_redirects=True, headers={"User-Agent": "Personal-Gaming-Assistant/1.0"})
 
     def close(self):
         self.client.close()
@@ -37,39 +35,29 @@ class WebContext:
             try:
                 response = self.client.get(url)
                 response.raise_for_status()
-                text = response.text[:20000]
-                results.append(WebSource(title=url, url=url, content=text, source=url))
+                results.append(WebSource(title=url, url=url, content=response.text[:20000], source=url))
             except Exception as exc:
                 results.append(WebSource(title=url, url=url, content=f"Fetch failed: {exc}", source=url))
         return results
 
 
 class OllamaClient:
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3.2"):
-        self.base_url = base_url.rstrip("/")
-        self.model = model
+    def __init__(self, base_url: str | None = None, model: str | None = None):
+        self.base_url = (base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")).rstrip("/")
+        self.model = model or os.getenv("OLLAMA_MODEL", "llama3.2")
         self.client = httpx.Client(timeout=120.0)
 
     def close(self):
         self.client.close()
 
     def chat_with_web_context(self, question: str, sources: list[WebSource]) -> str:
-        context = "\n\n".join(
-            f"SOURCE: {source.title}\nURL: {source.url}\nCONTENT:\n{source.content}"
-            for source in sources
-        )
+        context = "\n\n".join(f"SOURCE: {s.title}\nURL: {s.url}\nCONTENT:\n{s.content}" for s in sources)
         prompt = (
             "Answer in Dutch. Use the supplied web context first. "
-            "Do not invent prices, stock, dates or links. If the context is insufficient, say so.\n\n"
+            "Never invent prices, stock, dates or links. Cite the relevant source URLs in the answer. "
+            "If the supplied sources do not contain enough evidence, say so.\n\n"
             f"WEB CONTEXT:\n{context}\n\nQUESTION:\n{question}"
         )
-        response = self.client.post(
-            f"{self.base_url}/api/chat",
-            json={
-                "model": self.model,
-                "stream": False,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-        )
+        response = self.client.post(f"{self.base_url}/api/chat", json={"model": self.model, "stream": False, "messages": [{"role": "user", "content": prompt}]})
         response.raise_for_status()
         return response.json().get("message", {}).get("content", "")
