@@ -12,36 +12,54 @@ class GamesComYear:
     start: date
     end: date
     official_url: str
+    opening_night_live: date | None = None
 
 
 SEASONS = {
-    2026: GamesComYear(2026, date(2026, 8, 26), date(2026, 8, 30), "https://www.gamescom.global/"),
+    2026: GamesComYear(
+        2026,
+        date(2026, 8, 26),
+        date(2026, 8, 30),
+        "https://www.gamescom.global/",
+        date(2026, 8, 25),
+    ),
 }
 
 
+def live_start(season: GamesComYear) -> date:
+    """Return the first day counted as live, including Opening Night Live."""
+    return season.opening_night_live or season.start
+
+
 def next_gamescom(after: date) -> GamesComYear | None:
-    future = [s for s in SEASONS.values() if s.start > after]
-    return min(future, key=lambda x: x.start) if future else None
+    future = [s for s in SEASONS.values() if live_start(s) > after]
+    return min(future, key=lambda x: live_start(x)) if future else None
 
 
 def countdown(after: date, now: datetime | None = None) -> dict:
     now = now or datetime.now().astimezone()
     current = SEASONS.get(after.year)
-    if current and current.start <= now.date() <= current.end:
-        return {"status": "live", "target": current.end.isoformat(), "days": 0}
-    if current and now.date() < current.start:
+    if current and live_start(current) <= now.date() <= current.end:
+        return {
+            "status": "live",
+            "target": current.end.isoformat(),
+            "days": 0,
+        }
+    if current and now.date() < live_start(current):
+        start = live_start(current)
         return {
             "status": "countdown",
-            "target": current.start.isoformat(),
-            "days": max(0, (current.start - now.date()).days),
+            "target": start.isoformat(),
+            "days": max(0, (start - now.date()).days),
         }
     upcoming = next_gamescom(now.date())
     if not upcoming:
         return {"status": "awaiting_next_year_data", "target": None, "days": None}
+    start = live_start(upcoming)
     return {
         "status": "countdown",
-        "target": upcoming.start.isoformat(),
-        "days": max(0, (upcoming.start - now.date()).days),
+        "target": start.isoformat(),
+        "days": max(0, (start - now.date()).days),
     }
 
 
@@ -81,13 +99,15 @@ def write_dashboard_data(events: list[dict] | None = None) -> None:
             "name": "gamescom 2026",
             "start": season.start.isoformat(),
             "end": season.end.isoformat(),
+            "live_start": live_start(season).isoformat(),
             "source": "GamesCom official",
             "url": season.official_url,
         })
         normalized_events.insert(0, {
             "type": "gamescom_opening_night_live",
             "name": "Opening Night Live",
-            "date": "2026-08-25",
+            "date": season.opening_night_live.isoformat() if season.opening_night_live else None,
+            "counts_as_live_day": True,
             "source": "GamesCom official",
             "url": season.official_url,
         })
@@ -97,6 +117,9 @@ def write_dashboard_data(events: list[dict] | None = None) -> None:
         "status": status,
         "start": start,
         "end": end,
+        "live_start": live_start(season).isoformat() if season else (upcoming.opening_night_live.isoformat() if upcoming and upcoming.opening_night_live else start),
+        "opening_night_live": season.opening_night_live.isoformat() if season and season.opening_night_live else None,
+        "counted_live_days": 6 if season and season.opening_night_live else None,
         "countdown_target": target,
         "countdown_days": state["days"],
         "events": normalized_events,
