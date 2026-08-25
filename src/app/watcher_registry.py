@@ -4,6 +4,7 @@ from collections.abc import Callable, Iterable
 import os
 
 from watchers.price_models import PriceObservation
+from config.game_price_watchlist import load_game_watchlist
 
 WatcherFetcher = Callable[[], Iterable[PriceObservation]]
 
@@ -12,7 +13,7 @@ def get_fetchers() -> tuple[WatcherFetcher, ...]:
     """Return enabled live watchers, including GamesCom/EPIX monitoring."""
     fetchers: list[WatcherFetcher] = []
 
-    steam_ids = _csv_ints("STEAM_APP_IDS")
+    steam_ids = load_game_watchlist()
     if steam_ids:
         from watchers.steamdb_adapter import SteamDBAdapter
         fetchers.append(SteamDBAdapter(steam_ids).fetch)
@@ -83,13 +84,3 @@ def get_fetchers() -> tuple[WatcherFetcher, ...]:
 
 def _csv(name: str) -> tuple[str, ...]:
     return tuple(item.strip() for item in os.getenv(name, "").split(",") if item.strip())
-
-
-def _csv_ints(name: str) -> tuple[int, ...]:
-    values: list[int] = []
-    for item in _csv(name):
-        try:
-            values.append(int(item))
-        except ValueError:
-            continue
-    return tuple(values)
