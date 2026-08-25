@@ -4,14 +4,14 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from main import build_update, load_config
-from orchestrator import run_once
+from run_all_watchers import run_all
 
 
 def run_update(roundup: bool = False) -> None:
     config = load_config()
-    result = run_once(roundup=roundup)
+    result = run_all(roundup=roundup)
     print(build_update(config, roundup=roundup), flush=True)
-    print(f"Live watcher run completed: {result['update']}", flush=True)
+    print(f"Full watcher run completed: {result['update']}", flush=True)
 
 
 def main() -> None:
@@ -25,6 +25,8 @@ def main() -> None:
             id=f"update-{time_string.replace(':', '')}",
             replace_existing=True,
             kwargs={"roundup": time_string == config["late_night_roundup_at"]},
+            max_instances=1,
+            coalesce=True,
         )
     scheduler.start()
 
