@@ -16,14 +16,27 @@ class WatcherRunResult:
 
 
 class WatcherPipeline:
-    """Run a watcher, compare it with persistent state, then save the snapshot."""
+    """Run a watcher against its own persistent snapshot scope."""
 
     def __init__(self, store: ObservationStore):
         self.store = store
 
-    def run(self, fetcher: Callable[[], Iterable[PriceObservation]]) -> WatcherRunResult:
-        previous = self.store.load()
+    @staticmethod
+    def scope_for(fetcher: Callable[[], Iterable[PriceObservation]]) -> str:
+        """Return a stable scope for a watcher callable."""
+        module = getattr(fetcher, "__module__", "unknown")
+        name = getattr(fetcher, "__qualname__", getattr(fetcher, "__name__", fetcher.__class__.__qualname__))
+        return f"{module}:{name}"
+
+    def run(
+        self,
+        fetcher: Callable[[], Iterable[PriceObservation]],
+        *,
+        scope: str | None = None,
+    ) -> WatcherRunResult:
+        watcher_scope = scope or self.scope_for(fetcher)
+        previous = self.store.load(watcher_scope)
         current = normalize_observations(fetcher())
         changes = reportable_changes(compare_observations(previous, current))
-        self.store.save(current)
+        self.store.save(current, watcher_scope)
         return WatcherRunResult(current=current, changes=changes)
