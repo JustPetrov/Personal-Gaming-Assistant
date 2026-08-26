@@ -14,3 +14,8 @@ def test_classify_evening_ticket():
 def test_classify_low_stock():
     regular, evening, low, sold_out = GamesComTicketSource.classify_text("Limited availability")
     assert low is True
+
+
+def test_unknown_portal_is_not_sold_out():
+    regular, evening, low, sold_out = GamesComTicketSource.classify_text("Gamescom visitor ticket portal")
+    assert (regular, evening, low, sold_out) == (False, False, False, False)
