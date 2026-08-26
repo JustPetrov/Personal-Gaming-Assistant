@@ -33,6 +33,30 @@ def _local_date() -> str:
     return datetime.now(ZoneInfo(timezone_name)).date().isoformat()
 
 
+def _observation_day(observations: list[dict[str, Any]]) -> str:
+    """Return the local calendar day represented by the current observations.
+
+    This is important for late-night reconstruction: the persisted history can
+    contain the requested day's data even when the test/worker is running on a
+    different calendar day.
+    """
+    timezone_name = os.getenv("TIMEZONE", "Europe/Amsterdam")
+    zone = ZoneInfo(timezone_name)
+    for item in reversed(observations):
+        for field in ("checked_at", "timestamp", "observed_at", "created_at"):
+            value = item.get(field)
+            if not value:
+                continue
+            try:
+                parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                return parsed.astimezone(zone).date().isoformat()
+            except ValueError:
+                continue
+    return _local_date()
+
+
 def _merge_daily_observations(observations: list[dict[str, Any]], day: str) -> list[dict[str, Any]]:
     """Merge current observations with persisted observations from the same day."""
     history_rows = JsonHistory().for_date(day)
@@ -63,7 +87,7 @@ def build_news_context_from_observations(
     ram_item_ids = ram_item_ids or []
     gpu_item_ids = gpu_item_ids or []
     if edition == "late-night":
-        observations = _merge_daily_observations(observations, _local_date())
+        observations = _merge_daily_observations(observations, _observation_day(observations))
 
     history = PriceHistory()
     game_prices = build_game_price_news(observations)
