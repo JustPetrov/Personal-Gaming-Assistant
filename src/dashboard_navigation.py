@@ -19,6 +19,6 @@ def register(app):
         text = body.decode("utf-8", errors="replace")
         if "<body" in text:
             text = text.replace("<body>", "<body>" + NAV, 1)
-        response = Response(content=text, status_code=response.status_code, headers=dict(response.headers), media_type="text/html")
-        response.headers.pop("content-length", None)
-        return response
+        headers = dict(response.headers)
+        headers.pop("content-length", None)
+        return Response(content=text, status_code=response.status_code, headers=headers, media_type="text/html")
