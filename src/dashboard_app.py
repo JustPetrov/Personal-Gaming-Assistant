@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 _MODULE_PATH = Path(__file__).with_name("dashboard.py")
 _SPEC = importlib.util.spec_from_file_location("pga_dashboard_module", _MODULE_PATH)
@@ -23,3 +23,12 @@ from integrations_page import register as register_integrations  # noqa: E402
 register_integrations(app)
 from dashboard_navigation import register as register_navigation  # noqa: E402
 register_navigation(app)
+from watchers_live_prices import register as register_watchers_live_prices  # noqa: E402
+register_watchers_live_prices(app)
+
+
+@app.middleware("http")
+async def watchers_live_prices_redirect(request, call_next):
+    if request.url.path == "/watchers":
+        return RedirectResponse(url="/watchers-live-prices", status_code=307)
+    return await call_next(request)
